@@ -2,7 +2,15 @@
 
 A full-stack project management web app with role-based access control, task tracking, and team collaboration.
 
-## Features
+## 🌐 Live URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend (Vercel) | https://ethara-task-manager-seven.vercel.app |
+| Backend API (Railway) | https://ethara-task-manager-production-fd6b.up.railway.app |
+| GitHub Repository | https://github.com/alkasingh9911/-ethara-task-manager |
+
+## ✅ Features
 
 - **Authentication** — JWT-based signup/login
 - **Projects** — Create, manage, and delete projects
@@ -11,7 +19,7 @@ A full-stack project management web app with role-based access control, task tra
 - **Dashboard** — Overview of stats, your tasks, overdue items
 - **Role-Based Access** — Admins manage everything; Members update task status only
 
-## Tech Stack
+## 🛠 Tech Stack
 
 | Layer | Tech |
 |-------|------|
@@ -19,32 +27,35 @@ A full-stack project management web app with role-based access control, task tra
 | Backend | Node.js, Express |
 | Database | PostgreSQL via Prisma ORM |
 | Auth | JWT (jsonwebtoken + bcryptjs) |
-| Deployment | Railway |
+| Frontend Deployment | Vercel |
+| Backend Deployment | Railway |
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-taskflow/
+ethara-task-manager/
 ├── backend/
 │   ├── prisma/
-│   │   ├── schema.prisma     # DB models
-│   │   └── seed.js           # Demo data
+│   │   ├── schema.prisma        # DB models
+│   │   └── seed.js              # Demo data
 │   ├── src/
-│   │   ├── index.js          # Express app entry
-│   │   ├── lib/prisma.js     # Prisma client
-│   │   ├── middleware/auth.js # JWT + RBAC middleware
-│   │   └── routes/           # auth, projects, tasks, users, dashboard
+│   │   ├── index.js             # Express app entry
+│   │   ├── lib/prisma.js        # Prisma client
+│   │   ├── middleware/
+│   │   │   ├── auth.js          # JWT + RBAC middleware
+│   │   │   └── errorHandler.js  # Async error wrapper
+│   │   └── routes/              # auth, projects, tasks, users, dashboard
 │   └── railway.toml
 └── frontend/
     ├── src/
-    │   ├── components/       # Layout, Modal, Badges
-    │   ├── context/          # AuthContext
-    │   ├── lib/api.js        # Axios instance
-    │   └── pages/            # Dashboard, Projects, ProjectDetail, Profile
-    └── railway.toml
+    │   ├── components/          # Layout, Modal, Badges
+    │   ├── context/             # AuthContext
+    │   ├── lib/api.js           # Axios instance
+    │   └── pages/               # Dashboard, Projects, ProjectDetail, Profile
+    └── vercel.json
 ```
 
-## Local Development
+## 💻 Local Development
 
 ### Prerequisites
 - Node.js 18+
@@ -55,59 +66,53 @@ taskflow/
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env with your DATABASE_URL and JWT_SECRET
+# Edit .env — set DATABASE_URL and JWT_SECRET
 
 npm install
 npx prisma db push        # Create tables
-npx prisma generate       # Generate client
 node prisma/seed.js       # Seed demo data
-npm run dev               # Start on :5000
+npm run dev               # Starts on :5000
 ```
 
 ### Frontend
 
 ```bash
 cd frontend
+cp .env.example .env
+# Edit .env — set VITE_API_URL=http://localhost:5000/api
+
 npm install
-npm run dev               # Start on :5173
+npm run dev               # Starts on :5173
 ```
 
-## Deployment on Railway
+## 🚀 Deployment
 
-### 1. Create a Railway project
+### Backend — Railway
 
-Go to [railway.app](https://railway.app) and create a new project.
+1. Go to [railway.app](https://railway.app) → New Project
+2. Add a **PostgreSQL** database service
+3. Add a new service from **GitHub Repo**, set Root Directory to `backend`
+4. Set environment variables:
+   ```
+   DATABASE_URL   = <from PostgreSQL service — use ${{Postgres.DATABASE_URL}}>
+   JWT_SECRET     = <a long random string>
+   CLIENT_URL     = <your Vercel frontend URL>
+   ```
+5. Railway auto-runs `prisma db push` and starts the server via `railway.toml`
 
-### 2. Add PostgreSQL
+### Frontend — Vercel
 
-In your Railway project, click **+ New** → **Database** → **PostgreSQL**.  
-Copy the `DATABASE_URL` from the database's **Variables** tab.
+1. Go to [vercel.com](https://vercel.com) → New Project → import GitHub repo
+2. Set **Root Directory** to `frontend`
+3. Add environment variable:
+   ```
+   VITE_API_URL = https://ethara-task-manager-production-fd6b.up.railway.app/api
+   ```
+4. Deploy — `vercel.json` handles SPA routing automatically
 
-### 3. Deploy the Backend
+### Seed Demo Data
 
-- Click **+ New** → **GitHub Repo** → select your repo
-- Set the **Root Directory** to `backend`
-- Add environment variables:
-  ```
-  DATABASE_URL=<from PostgreSQL service>
-  JWT_SECRET=<a long random string>
-  CLIENT_URL=<your frontend Railway URL>
-  PORT=5000
-  ```
-- Railway will auto-detect `railway.toml` and run migrations on deploy
-
-### 4. Deploy the Frontend
-
-- Click **+ New** → **GitHub Repo** → select your repo again
-- Set the **Root Directory** to `frontend`
-- Add environment variable:
-  ```
-  VITE_API_URL=https://<your-backend-service>.railway.app/api
-  ```
-
-### 5. Seed Demo Data (optional)
-
-In the Railway backend service shell:
+In Railway → backend service → Shell:
 ```bash
 node prisma/seed.js
 ```
@@ -116,7 +121,7 @@ Demo accounts:
 - `admin@taskflow.com` / `password123`
 - `member@taskflow.com` / `password123`
 
-## API Reference
+## 📡 API Reference
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
@@ -140,7 +145,7 @@ Demo accounts:
 
 *Members can only update `status`; Admins can update all fields.
 
-## Role Permissions
+## 🔐 Role Permissions
 
 | Action | Admin | Member |
 |--------|-------|--------|
