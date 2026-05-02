@@ -1,18 +1,28 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const prisma = require('../lib/prisma');
-const { authenticate, requireProjectMember } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 router.use(authenticate);
 
-// GET /api/projects/:projectId/tasks
-router.get('/projects/:projectId/tasks', requireProjectMember, asyncHandler(async (req, res) => {
-  const { status, priority, assignedToId } = req.query;
+// Helper — verify user is a member of a project, returns the membership or null
+async function getMembership(userId, projectId) {
+  return prisma.projectMember.findUnique({
+    where: { userId_projectId: { userId, projectId } },
+  });
+}
 
+// GET /api/projects/:projectId/tasks
+router.get('/projects/:projectId/tasks', asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+  const member = await getMembership(req.user.id, projectId);
+  if (!member) return res.status(403).json({ message: 'Not a member of this project' });
+
+  const { status, priority, assignedToId } = req.query;
   const where = {
-    projectId: req.params.projectId,
+    projectId,
     ...(status && { status }),
     ...(priority && { priority }),
     ...(assignedToId && { assignedToId }),
@@ -32,7 +42,6 @@ router.get('/projects/:projectId/tasks', requireProjectMember, asyncHandler(asyn
 // POST /api/projects/:projectId/tasks
 router.post(
   '/projects/:projectId/tasks',
-  requireProjectMember,
   [
     body('title').trim().notEmpty().withMessage('Title is required'),
     body('description').optional().trim(),
@@ -45,13 +54,15 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
+    const { projectId } = req.params;
+    const member = await getMembership(req.user.id, projectId);
+    if (!member) return res.status(403).json({ message: 'Not a member of this project' });
+
     const { title, description, status, priority, dueDate, assignedToId } = req.body;
 
     if (assignedToId) {
-      const isMember = await prisma.projectMember.findUnique({
-        where: { userId_projectId: { userId: assignedToId, projectId: req.params.projectId } },
-      });
-      if (!isMember) return res.status(400).json({ message: 'Assignee is not a project member' });
+      const assigneeMember = await getMembership(assignedToId, projectId);
+      if (!assigneeMember) return res.status(400).json({ message: 'Assignee is not a project member' });
     }
 
     const task = await prisma.task.create({
@@ -61,7 +72,7 @@ router.post(
         status: status || 'TODO',
         priority: priority || 'MEDIUM',
         dueDate: dueDate ? new Date(dueDate) : null,
-        projectId: req.params.projectId,
+        projectId,
         createdById: req.user.id,
         assignedToId: assignedToId || null,
       },
@@ -86,9 +97,7 @@ router.get('/tasks/:taskId', asyncHandler(async (req, res) => {
   });
   if (!task) return res.status(404).json({ message: 'Task not found' });
 
-  const member = await prisma.projectMember.findUnique({
-    where: { userId_projectId: { userId: req.user.id, projectId: task.projectId } },
-  });
+  const member = await getMembership(req.user.id, task.projectId);
   if (!member) return res.status(403).json({ message: 'Access denied' });
 
   res.json(task);
@@ -112,9 +121,7 @@ router.put(
     const task = await prisma.task.findUnique({ where: { id: req.params.taskId } });
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    const member = await prisma.projectMember.findUnique({
-      where: { userId_projectId: { userId: req.user.id, projectId: task.projectId } },
-    });
+    const member = await getMembership(req.user.id, task.projectId);
     if (!member) return res.status(403).json({ message: 'Access denied' });
 
     const { title, description, status, priority, dueDate, assignedToId } = req.body;
@@ -146,9 +153,7 @@ router.delete('/tasks/:taskId', asyncHandler(async (req, res) => {
   const task = await prisma.task.findUnique({ where: { id: req.params.taskId } });
   if (!task) return res.status(404).json({ message: 'Task not found' });
 
-  const member = await prisma.projectMember.findUnique({
-    where: { userId_projectId: { userId: req.user.id, projectId: task.projectId } },
-  });
+  const member = await getMembership(req.user.id, task.projectId);
   if (!member || member.role !== 'ADMIN') {
     return res.status(403).json({ message: 'Admin access required' });
   }
