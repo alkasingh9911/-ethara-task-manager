@@ -1,5 +1,7 @@
 # ⚡ TaskFlow — Project Management App
 
+**Author:** Alka Singh
+
 A full-stack project management web app with role-based access control, task tracking, and team collaboration.
 
 ## 🌐 Live URLs
