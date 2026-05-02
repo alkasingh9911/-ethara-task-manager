@@ -39,4 +39,5 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 8080;
+console.log("Starting server...");
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
