@@ -2,12 +2,13 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const prisma = require('../lib/prisma');
 const { authenticate, requireProjectAdmin, requireProjectMember } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 router.use(authenticate);
 
-// GET /api/projects — list projects the user belongs to
-router.get('/', async (req, res) => {
+// GET /api/projects
+router.get('/', asyncHandler(async (req, res) => {
   const projects = await prisma.project.findMany({
     where: { members: { some: { userId: req.user.id } } },
     include: {
@@ -20,16 +21,16 @@ router.get('/', async (req, res) => {
     orderBy: { createdAt: 'desc' },
   });
   res.json(projects);
-});
+}));
 
-// POST /api/projects — create project (creator becomes ADMIN)
+// POST /api/projects
 router.post(
   '/',
   [
     body('name').trim().notEmpty().withMessage('Project name is required'),
     body('description').optional().trim(),
   ],
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
@@ -44,11 +45,11 @@ router.post(
       include: { _count: { select: { tasks: true, members: true } } },
     });
     res.status(201).json(project);
-  }
+  })
 );
 
 // GET /api/projects/:id
-router.get('/:id', requireProjectMember, async (req, res) => {
+router.get('/:id', requireProjectMember, asyncHandler(async (req, res) => {
   const project = await prisma.project.findUnique({
     where: { id: req.params.id },
     include: {
@@ -59,9 +60,9 @@ router.get('/:id', requireProjectMember, async (req, res) => {
     },
   });
   res.json(project);
-});
+}));
 
-// PUT /api/projects/:id — admin only
+// PUT /api/projects/:id
 router.put(
   '/:id',
   requireProjectAdmin,
@@ -69,7 +70,7 @@ router.put(
     body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
     body('description').optional().trim(),
   ],
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
@@ -79,16 +80,16 @@ router.put(
       data: { ...(name && { name }), ...(description !== undefined && { description }) },
     });
     res.json(project);
-  }
+  })
 );
 
-// DELETE /api/projects/:id — admin only
-router.delete('/:id', requireProjectAdmin, async (req, res) => {
+// DELETE /api/projects/:id
+router.delete('/:id', requireProjectAdmin, asyncHandler(async (req, res) => {
   await prisma.project.delete({ where: { id: req.params.id } });
   res.json({ message: 'Project deleted' });
-});
+}));
 
-// POST /api/projects/:id/members — invite member (admin only)
+// POST /api/projects/:id/members
 router.post(
   '/:id/members',
   requireProjectAdmin,
@@ -96,7 +97,7 @@ router.post(
     body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
     body('role').optional().isIn(['ADMIN', 'MEMBER']).withMessage('Role must be ADMIN or MEMBER'),
   ],
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
@@ -114,15 +115,15 @@ router.post(
       include: { user: { select: { id: true, name: true, email: true } } },
     });
     res.status(201).json(member);
-  }
+  })
 );
 
-// PUT /api/projects/:id/members/:userId — change role (admin only)
+// PUT /api/projects/:id/members/:userId
 router.put(
   '/:id/members/:userId',
   requireProjectAdmin,
   [body('role').isIn(['ADMIN', 'MEMBER']).withMessage('Role must be ADMIN or MEMBER')],
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
@@ -132,15 +133,15 @@ router.put(
       include: { user: { select: { id: true, name: true, email: true } } },
     });
     res.json(member);
-  }
+  })
 );
 
-// DELETE /api/projects/:id/members/:userId — remove member (admin only)
-router.delete('/:id/members/:userId', requireProjectAdmin, async (req, res) => {
+// DELETE /api/projects/:id/members/:userId
+router.delete('/:id/members/:userId', requireProjectAdmin, asyncHandler(async (req, res) => {
   await prisma.projectMember.delete({
     where: { userId_projectId: { userId: req.params.userId, projectId: req.params.id } },
   });
   res.json({ message: 'Member removed' });
-});
+}));
 
 module.exports = router;

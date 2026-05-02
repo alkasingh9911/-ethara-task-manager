@@ -1,16 +1,14 @@
 const express = require('express');
-const { body, query, validationResult } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const prisma = require('../lib/prisma');
-const { authenticate, requireProjectMember, requireProjectAdmin } = require('../middleware/auth');
+const { authenticate, requireProjectMember } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/errorHandler');
 
-const router = express.Router({ mergeParams: true });
+const router = express.Router();
 router.use(authenticate);
 
-// All task routes are scoped under /api/projects/:projectId/tasks
-// but also accessible at /api/tasks for cross-project views
-
 // GET /api/projects/:projectId/tasks
-router.get('/projects/:projectId/tasks', requireProjectMember, async (req, res) => {
+router.get('/projects/:projectId/tasks', requireProjectMember, asyncHandler(async (req, res) => {
   const { status, priority, assignedToId } = req.query;
 
   const where = {
@@ -29,9 +27,9 @@ router.get('/projects/:projectId/tasks', requireProjectMember, async (req, res) 
     orderBy: { createdAt: 'desc' },
   });
   res.json(tasks);
-});
+}));
 
-// POST /api/projects/:projectId/tasks — any member can create
+// POST /api/projects/:projectId/tasks
 router.post(
   '/projects/:projectId/tasks',
   requireProjectMember,
@@ -43,13 +41,12 @@ router.post(
     body('dueDate').optional().isISO8601().withMessage('Invalid date format'),
     body('assignedToId').optional().isString(),
   ],
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const { title, description, status, priority, dueDate, assignedToId } = req.body;
 
-    // Validate assignee is a project member
     if (assignedToId) {
       const isMember = await prisma.projectMember.findUnique({
         where: { userId_projectId: { userId: assignedToId, projectId: req.params.projectId } },
@@ -74,11 +71,11 @@ router.post(
       },
     });
     res.status(201).json(task);
-  }
+  })
 );
 
 // GET /api/tasks/:taskId
-router.get('/tasks/:taskId', async (req, res) => {
+router.get('/tasks/:taskId', asyncHandler(async (req, res) => {
   const task = await prisma.task.findUnique({
     where: { id: req.params.taskId },
     include: {
@@ -89,16 +86,15 @@ router.get('/tasks/:taskId', async (req, res) => {
   });
   if (!task) return res.status(404).json({ message: 'Task not found' });
 
-  // Verify user is a member of the task's project
   const member = await prisma.projectMember.findUnique({
     where: { userId_projectId: { userId: req.user.id, projectId: task.projectId } },
   });
   if (!member) return res.status(403).json({ message: 'Access denied' });
 
   res.json(task);
-});
+}));
 
-// PUT /api/tasks/:taskId — member can update status; admin can update anything
+// PUT /api/tasks/:taskId
 router.put(
   '/tasks/:taskId',
   [
@@ -109,7 +105,7 @@ router.put(
     body('dueDate').optional({ nullable: true }).isISO8601(),
     body('assignedToId').optional({ nullable: true }),
   ],
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
@@ -123,7 +119,6 @@ router.put(
 
     const { title, description, status, priority, dueDate, assignedToId } = req.body;
 
-    // Members can only update status; admins can update everything
     let updateData = {};
     if (member.role === 'ADMIN') {
       if (title !== undefined) updateData.title = title;
@@ -143,11 +138,11 @@ router.put(
       },
     });
     res.json(updated);
-  }
+  })
 );
 
-// DELETE /api/tasks/:taskId — admin only
-router.delete('/tasks/:taskId', async (req, res) => {
+// DELETE /api/tasks/:taskId
+router.delete('/tasks/:taskId', asyncHandler(async (req, res) => {
   const task = await prisma.task.findUnique({ where: { id: req.params.taskId } });
   if (!task) return res.status(404).json({ message: 'Task not found' });
 
@@ -160,6 +155,6 @@ router.delete('/tasks/:taskId', async (req, res) => {
 
   await prisma.task.delete({ where: { id: req.params.taskId } });
   res.json({ message: 'Task deleted' });
-});
+}));
 
 module.exports = router;

@@ -3,12 +3,12 @@ const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const prisma = require('../lib/prisma');
 const { authenticate } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 router.use(authenticate);
 
-// GET /api/users/search?q=email — search users to invite
-router.get('/search', async (req, res) => {
+router.get('/search', asyncHandler(async (req, res) => {
   const { q } = req.query;
   if (!q || q.length < 2) return res.json([]);
 
@@ -24,9 +24,8 @@ router.get('/search', async (req, res) => {
     take: 10,
   });
   res.json(users);
-});
+}));
 
-// PUT /api/users/me — update profile
 router.put(
   '/me',
   [
@@ -34,7 +33,7 @@ router.put(
     body('currentPassword').optional(),
     body('newPassword').optional().isLength({ min: 6 }),
   ],
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
@@ -56,7 +55,7 @@ router.put(
       select: { id: true, name: true, email: true, updatedAt: true },
     });
     res.json(updated);
-  }
+  })
 );
 
 module.exports = router;

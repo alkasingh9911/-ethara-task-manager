@@ -1,16 +1,15 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { authenticate } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 router.use(authenticate);
 
-// GET /api/dashboard — aggregated stats for the current user
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const now = new Date();
 
-  // Projects the user belongs to
   const projectIds = (
     await prisma.projectMember.findMany({
       where: { userId },
@@ -61,17 +60,10 @@ router.get('/', async (req, res) => {
   ]);
 
   res.json({
-    stats: {
-      totalProjects,
-      totalTasks,
-      todoTasks,
-      inProgressTasks,
-      doneTasks,
-      overdueTasks,
-    },
+    stats: { totalProjects, totalTasks, todoTasks, inProgressTasks, doneTasks, overdueTasks },
     myTasks,
     recentTasks,
   });
-});
+}));
 
 module.exports = router;
